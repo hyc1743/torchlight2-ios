@@ -1,0 +1,28 @@
+# User-owned game data and Switch keys. Never commit these files.
+Gamedata/
+*.nsp
+*.nsz
+*.ncz
+*.xci
+*.nca
+*.tik
+*.cert
+prod.keys
+title.keys
+*.keys
+
+# Local build state and extracted content.
+work/
+resource-parts/
+*_build/
+build/
+dist/
+*.ipa
+*.xcarchive
+*.dSYM/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local checkout of the upstream dependency when not using the submodule.
+vendor/nxnative-local/

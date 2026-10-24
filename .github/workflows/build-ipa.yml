@@ -1,0 +1,61 @@
+name: Build Torchlight II IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      survey_only:
+        description: Run the nxnative survey without producing an IPA
+        required: false
+        default: false
+        type: boolean
+      publish_ipa:
+        description: Upload the IPA to the public Actions artifact (default keeps it on the local runner)
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    # The runner owner mounts the local dump and keys. Hosted runners are not
+    # used because game resources must remain local to the owner.
+    runs-on: [self-hosted, macOS, ARM64, torchlight2-local]
+    steps:
+      - name: Checkout public source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Validate public tree
+        run: python3 scripts/validate_public_tree.py
+
+      - name: Install nxnative dependencies
+        run: |
+          brew install xcodegen zstd spirv-cross glslang
+          brew install --cask dotnet-sdk
+          python3 -m pip install lz4 capstone fonttools "backports.zstd; python_version < '3.14'"
+
+      - name: Build from local resources
+        env:
+          TORCHLIGHT2_RESOURCES: ${{ runner.temp }}/torchlight2-resources
+          TORCHLIGHT2_KEYS: ${{ runner.temp }}/torchlight2-prod.keys
+        run: |
+          test -d "$TORCHLIGHT2_RESOURCES"
+          test -f "$TORCHLIGHT2_KEYS"
+          args=(--resources "$TORCHLIGHT2_RESOURCES" --keys "$TORCHLIGHT2_KEYS" --out "$RUNNER_TEMP/TorchlightIIMobile.ipa")
+          if [ "${{ inputs.survey_only }}" = "true" ]; then args+=(--survey-only); fi
+          python3 scripts/build_local_ipa.py "${args[@]}"
+
+      - name: Upload optional public artifact
+        if: ${{ !inputs.survey_only && inputs.publish_ipa }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: torchlight2-ios-build
+          path: |
+            ${{ runner.temp }}/TorchlightIIMobile.ipa
+            ${{ runner.temp }}/torchlight2-resources/010090400D366000_survey/**
+            ${{ runner.temp }}/torchlight2-resources/010090400D366000_build/logs/**
+          if-no-files-found: error
+
+      - name: Keep IPA local by default
+        if: ${{ !inputs.survey_only && !inputs.publish_ipa }}
+        run: echo "IPA remains on the self-hosted runner at $RUNNER_TEMP/TorchlightIIMobile.ipa"
