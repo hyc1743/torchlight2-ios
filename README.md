@@ -108,8 +108,9 @@ on that runner. The workflow expects these local paths:
 The job reconstructs the archives inside the runner's temporary directory and
 never uploads the split paths or their contents. The `publish_ipa` input
 defaults to uploading the slim IPA as a public Actions artifact; set it to
-`false` to keep the executable local. The generated ROMFSARC shards stay on
-the runner. Do not replace this with a hosted runner
+`false` to keep the executable local. The metadata-only
+`romfs-manifest.json` may travel with the artifact; the generated ROMFSARC
+shards stay on the runner. Do not replace this with a hosted runner
 plus an uploaded game archive: that would publish proprietary game resources
 outside the local boundary.
 
