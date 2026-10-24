@@ -1,0 +1,13 @@
+--- a/dm/tools/patch_nso.py
++++ b/dm/tools/patch_nso.py
+@@ -748,6 +748,10 @@
+                 if not tgt and tail_call(insl, j): tailcalls.add(ins.address); continue
+                 if not tgt and (far := jump_bytes_far(insl, j)): jumps[ins.address] = far; continue
+                 if not tgt: tgt = jump_offsets(insl, j, copy_first=True, far_base=True)   # the index copied before the check (check_before_copy) or the base set far back, only where every other form failed
++                if not tgt and os.environ.get('TL2_DEBUG_JUMPTABLE') == '1':
++                    print(f'UNRECOGNIZED_JUMPTABLE {ins.address:x} function {fa:x}..{fb:x}', file=sys.stderr)
++                    for q in insl[max(0, j - 40):j + 1]:
++                        print(f'  {q.address:x}: {q.mnemonic} {q.op_str}', file=sys.stderr)
+                 assert tgt, f'jump table {ins.address:x}'
+                 tabjumps[ins.address] = tgt; continue
+             jumps[ins.address] = (base, width)
