@@ -56,7 +56,7 @@ jobs:
         run: python3 scripts/validate_public_tree.py
 
       - name: Apply NX2Apple ROMFSARC segment patch
-        run: python3 scripts/apply_nx2apple_patches.py --patch patches/nx2apple-jumptable-debug.patch
+        run: python3 scripts/apply_nx2apple_patches.py --debug-jumptable
 
       - name: Compile and run segmented ROMFSARC reader test
         run: |
@@ -91,6 +91,7 @@ jobs:
           TORCHLIGHT2_RESOURCE_KEY: ${{ secrets.TORCHLIGHT2_RESOURCE_KEY }}
           TORCHLIGHT2_PROD_KEYS: ${{ secrets.TORCHLIGHT2_PROD_KEYS }}
           TL2_DEBUG_JUMPTABLE: "1"
+          TL2_JUMPTABLE_LOG: ${{ runner.temp }}/torchlight2-jumptable.log
         run: |
           test -n "$TORCHLIGHT2_RESOURCE_KEY"
           test -n "$TORCHLIGHT2_PROD_KEYS"
@@ -133,6 +134,14 @@ jobs:
       - name: Keep IPA local by default
         if: ${{ !inputs.survey_only && !inputs.publish_ipa }}
         run: echo "IPA remains on the hosted runner at $RUNNER_TEMP/TorchlightIIMobile.ipa"
+
+      - name: Upload jump table diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: torchlight2-jumptable-diagnostics
+          path: ${{ runner.temp }}/torchlight2-jumptable.log
+          if-no-files-found: ignore
 
       - name: Remove decrypted build inputs
         if: always()

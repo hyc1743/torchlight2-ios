@@ -13,6 +13,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend-dir", type=Path, default=Path("vendor/nx2apple"))
     parser.add_argument("--patch", type=Path, action="append")
+    parser.add_argument("--debug-jumptable", action="store_true")
     return parser.parse_args()
 
 
@@ -34,6 +35,14 @@ def main() -> int:
         if reverse.returncode == 0: print(f"already applied {patch.name}"); continue
         sys.stderr.write(check.stderr or reverse.stderr)
         raise SystemExit(f"NX2Apple patch does not apply cleanly: {patch.name}")
+    if args.debug_jumptable:
+        target = backend / "dm/tools/patch_nso.py"
+        raw = target.read_bytes()
+        marker = b"                assert tgt, f'jump table {ins.address:x}'"
+        addition = b"                if not tgt:\n                    lines = [f'UNRECOGNIZED_JUMPTABLE {ins.address:x} function {fa:x}..{fb:x}']\n                    lines += [f'  {q.address:x}: {q.mnemonic} {q.op_str}' for q in insl[max(0, j - 40):j + 1]]\n                    print('\\n'.join(lines), file=sys.stderr)\n                    try: open(os.environ.get('TL2_JUMPTABLE_LOG', '/tmp/torchlight2-jumptable.log'), 'a').write('\\n'.join(lines) + '\\n')\n                    except OSError: pass\n"
+        if marker in raw and addition not in raw:
+            target.write_bytes(raw.replace(marker, addition + marker, 1))
+            print("applied jump-table diagnostics")
 
 
 if __name__ == "__main__":
