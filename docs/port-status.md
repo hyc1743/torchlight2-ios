@@ -8,6 +8,8 @@ current build. A generated IPA alone is not proof that the game runs.
 | Local archive identity | Base, update, and optional DLC title IDs match the local dump | Done on Windows |
 | Resource packaging | Every part is <= 500,000,000 bytes; manifest and round-trip hashes verify | Done on Windows |
 | Public tree hygiene | No game archives, extracted content, or keys are tracked | Done |
+| Portable CI contract | Public tree, workflow, and split/restore checks pass on Ubuntu | Done |
+| IPA structure contract | Payload, Info.plist, Mach-O, and forbidden-file checks pass | Done for synthetic IPA |
 | nxnative survey | Mac log and survey for title `010090400D366000` | Pending self-hosted macOS |
 | Provisional profile | Generated profile, module census, SDK and graphics detection | Pending self-hosted macOS |
 | Mac boot | Host reaches the title screen with no fatal error | Pending |
