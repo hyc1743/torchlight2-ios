@@ -1,5 +1,5 @@
 diff --git a/dm/tools/patch_nso.py b/dm/tools/patch_nso.py
-index 884cbdb..1207de5 100644
+index 884cbdb..44f1c55 100644
 --- a/dm/tools/patch_nso.py
 +++ b/dm/tools/patch_nso.py
 @@ -506,6 +506,29 @@ def check_before_copy(insl, ctx, ld, idx):
@@ -20,7 +20,7 @@ index 884cbdb..1207de5 100644
 +    idx = 'w' + re.fullmatch(pattern, ld.op_str).group(1)
 +    if not any(p.mnemonic == 'mov' and p.op_str == f'{base_copy}, x18' for p in ctx[:ctx.index(ld)]): return None
 +    cmp = next((p for p in reversed(insl[max(0, insl.index(ld)-32):insl.index(ld)]) if p.mnemonic == 'cmp' and re.fullmatch(rf'{idx}, #(0x[0-9a-f]+|\d+)', p.op_str)), None)
-+    if cmp is None or insl[insl.index(cmp)+1].mnemonic not in ('b.hi','b.hs','b.cs'): return None
++    if cmp is None: return None
 +    n = int(cmp.op_str.split('#')[1], 0) + 1
 +    copy = next(p for p in ctx if p.mnemonic == 'mov' and p.op_str == f'{base_copy}, x18')
 +    tb = table_base(insl, insl.index(copy), 'x18')
