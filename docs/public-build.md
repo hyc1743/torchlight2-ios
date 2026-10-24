@@ -41,6 +41,8 @@ NX2Apple backend, so the IPA is slim and the merged RomFS is packed as local
 ROMFSARC shards. Copy `romfs.idx` and the numbered shards into the installed
 app's `Documents/romfs/` directory.
 
-`publish_ipa` defaults to uploading the slim IPA as an Actions artifact. Set
-it to `false` to keep the IPA on the cloud runner. ROMFSARC data shards are
-never uploaded by the workflow.
+`publish_ipa` defaults to uploading the slim IPA and the separately packaged
+ROMFSARC files as an Actions artifact. After downloading and extracting the
+artifact, copy `romfs.idx` and every `romfs.00`, `romfs.01`, ... file into the
+app's `Documents/romfs/` directory. The IPA remains slim and does not contain
+the game data.
