@@ -64,9 +64,17 @@ jobs:
           test -f "$TORCHLIGHT2_PARTS/manifest.json"
           test -f "$TORCHLIGHT2_KEYS"
           python3 scripts/assemble_resources.py "$TORCHLIGHT2_PARTS/manifest.json" --output-dir "$RUNNER_TEMP/torchlight2-resources"
-          args=(--resources "$RUNNER_TEMP/torchlight2-resources" --keys "$TORCHLIGHT2_KEYS" --out "$RUNNER_TEMP/TorchlightIIMobile.ipa")
+          args=(--resources "$RUNNER_TEMP/torchlight2-resources" --keys "$TORCHLIGHT2_KEYS" --backend nx2apple --work-dir "$RUNNER_TEMP/torchlight2-work" --out "$RUNNER_TEMP/TorchlightIIMobile.ipa")
           if [ "${{ inputs.survey_only }}" = "true" ]; then args+=(--survey-only); fi
           python3 scripts/build_local_ipa.py "${args[@]}"
+
+      - name: Pack local RomFS for iPhone
+        if: ${{ !inputs.survey_only }}
+        run: |
+          romfs=$(find "$RUNNER_TEMP/torchlight2-work" -type d -name RomFS -print | sort | tail -n 1)
+          test -n "$romfs"
+          python3 scripts/pack_romfs_for_iphone.py --romfs "$romfs" --output "$RUNNER_TEMP/torchlight2-romfs" --shard-mib 200
+          echo "ROMFSARC remains local at $RUNNER_TEMP/torchlight2-romfs"
 
       - name: Validate IPA structure
         if: ${{ !inputs.survey_only }}
@@ -79,9 +87,9 @@ jobs:
           name: torchlight2-ios-build
           path: |
             ${{ runner.temp }}/TorchlightIIMobile.ipa
-            ${{ runner.temp }}/torchlight2-resources/010090400D366000_survey/**
-            ${{ runner.temp }}/torchlight2-resources/010090400D366000_build/logs/**
-          if-no-files-found: error
+            ${{ runner.temp }}/torchlight2-work/**/survey.md
+            ${{ runner.temp }}/torchlight2-work/**/*.log
+          if-no-files-found: warn
 
       - name: Keep IPA local by default
         if: ${{ !inputs.survey_only && !inputs.publish_ipa }}

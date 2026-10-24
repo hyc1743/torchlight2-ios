@@ -30,6 +30,7 @@ def check_contract_files() -> dict:
         "scripts/validate_public_tree.py",
         "scripts/validate_ipa.py",
         "scripts/stage_runner_inputs.py",
+        "scripts/pack_romfs_for_iphone.py",
     ]
     missing = [item for item in required if not (ROOT / item).is_file()]
     if missing:
@@ -46,9 +47,12 @@ def check_contract_files() -> dict:
         "self-hosted",
         "publish_ipa:",
         "default: false",
+        "backend nx2apple",
     ):
         if required_text not in workflow:
             raise ValueError(f"workflow misses {required_text}")
+    if not (ROOT / "vendor" / "nx2apple" / "dm" / "tools" / "romfs_arc.py").is_file():
+        raise ValueError("NX2Apple ROMFSARC tool is missing")
     return {"required_files": len(required), "workflow_contract": True}
 
 
@@ -98,11 +102,41 @@ def check_split_round_trip() -> dict:
         return {"fixture_sources": 2, "fixture_parts": len(sizes), "fixture_max_bytes": max(sizes)}
 
 
+def check_romfs_arc() -> dict:
+    tool = ROOT / "vendor" / "nx2apple" / "dm" / "tools" / "romfs_arc.py"
+    if not tool.is_file():
+        raise ValueError("NX2Apple ROMFSARC tool is missing")
+    with tempfile.TemporaryDirectory(prefix="torchlight2-romfs-contract-") as raw:
+        work = Path(raw)
+        romfs = work / "romfs"
+        output = work / "archive"
+        (romfs / "Pack").mkdir(parents=True)
+        (romfs / "Sound").mkdir(parents=True)
+        (romfs / "Pack" / "main.bin").write_bytes(bytes(range(256)) * 5)
+        (romfs / "Sound" / "voice.dat").write_bytes(b"voice" * 701)
+        run(
+            sys.executable,
+            "scripts/pack_romfs_for_iphone.py",
+            "--romfs",
+            str(romfs),
+            "--output",
+            str(output),
+            "--shard-mib",
+            "1",
+        )
+        manifest = json.loads((output / "romfs-manifest.json").read_text(encoding="utf-8"))
+        sizes = [int(item["bytes"]) for item in manifest["parts"]]
+        if not sizes or max(sizes) > MAX_PUBLIC_PART_BYTES:
+            raise ValueError("ROMFSARC fixture exceeded the public part limit")
+        return {"romfsarc_parts": len(sizes), "romfsarc_max_bytes": max(sizes)}
+
+
 def main() -> int:
     result = {"contract": check_contract_files()}
     check_public_tree()
     result["public_tree"] = "passed"
     result["round_trip"] = check_split_round_trip()
+    result["romfs_arc"] = check_romfs_arc()
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0
 

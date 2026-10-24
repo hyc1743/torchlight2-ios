@@ -1,9 +1,10 @@
 # Torchlight II iOS build wrapper
 
 This repository contains the public build wrapper and resource handling tools
-for a **user-owned** Nintendo Switch copy of *Torchlight II*. It uses the
-open-source `nxnative` toolchain as a pinned submodule and keeps all game data
-and Switch keys outside version control.
+for a **user-owned** Nintendo Switch copy of *Torchlight II*. It follows the
+native-execution path used by `d2r-mobile` and `nxnative`, with the
+ROMFSARC/slim-IPA resource path from `NX2Apple`. All game data and Switch keys
+remain outside version control.
 
 The target device is an iPhone 17 Pro Max. The upstream runtime currently
 requires iOS/iPadOS 26 or later and an Apple chip in the supported class. The
@@ -27,9 +28,12 @@ the pinned upstream dependency. Do not commit any of the following:
 - `prod.keys`, `title.keys`, tickets, certificates, or title keys
 - generated IPAs, shader caches, saves, or logs containing game data
 
-The local splitter writes parts to `resource-parts/` and a manifest containing
-sizes and SHA-256 digests. The default part size is **500,000,000 bytes**, so
-every part stays below both decimal 512 MB and binary 512 MiB.
+The local splitter writes the original NSP/NSZ/DLC inputs to `resource-parts/`
+with a manifest containing sizes and SHA-256 digests. The default part size is
+**500,000,000 bytes**, so every input part stays below both decimal 512 MB and
+binary 512 MiB. After the Mac extracts the merged RomFS, the NX2Apple ROMFSARC
+packer writes the device resource set as `romfs.idx` plus shards; the workflow
+uses 200 MiB shards, also below the 512 MB limit.
 
 ## Local resource flow
 
@@ -68,11 +72,24 @@ python scripts/build_local_ipa.py \
   --out /path/to/TorchlightIIMobile.ipa
 ```
 
-The wrapper invokes `vendor/nxnative/scripts/build_ipa_from_nsp.py`. Because
-Torchlight II has no verified profile, it keeps the survey and provisional
-profile under the local resource directory and labels the resulting IPA as
-best effort. The `--survey-only` mode is useful before spending time on IPA
-packing.
+The default backend invokes `vendor/nx2apple/scripts/build_ipa_from_nsp.py` and
+produces a slim IPA with no RomFS in the bundle. The app reads a plain RomFS
+directory or ROMFSARC archive from `Documents/romfs`. Torchlight II has no
+verified profile, so the survey and provisional profile remain a best-effort
+bring-up; `--survey-only` should run before spending time on IPA packing.
+
+After a successful Mac build, create the local device resource set with:
+
+```bash
+python scripts/pack_romfs_for_iphone.py \
+  --romfs /path/to/extracted/RomFS \
+  --output /path/to/romfs-parts \
+  --shard-mib 200
+```
+
+Copy `romfs.idx`, `romfs.00`, `romfs.01`, and the remaining generated shards
+into the installed app's `Documents/romfs/` directory. The archive packer
+verifies every source file before producing its manifest.
 
 ## Public GitHub Actions workflow
 
@@ -88,9 +105,10 @@ The job reconstructs the archives inside the runner's temporary directory and
 never uploads the split paths or their contents. By default the IPA also
 stays on the self-hosted runner; the workflow prints its local path. A separate
 `publish_ipa` input can upload the IPA as a public Actions artifact only when
-you explicitly accept that the IPA contains game data. Do not replace this
-with a hosted runner plus an uploaded game archive: that would publish
-proprietary game resources outside the local boundary.
+you explicitly accept publishing the slim executable package. The generated
+ROMFSARC shards stay on the runner. Do not replace this with a hosted runner
+plus an uploaded game archive: that would publish proprietary game resources
+outside the local boundary.
 
 Every workflow dispatch first runs the portable Ubuntu validation job. It
 checks the public tree, the workflow contract, and a synthetic split/restore
@@ -98,6 +116,16 @@ round trip before the macOS job is allowed to use the local dump.
 After an IPA build, the workflow validates its ZIP/Payload layout, Info.plist,
 Mach-O executable, and rejects embedded NSP/NSZ/key files before any optional
 artifact upload.
+
+## Technical path from the reference projects
+
+- `d2r-mobile`: native execution on Apple silicon, iOS shell, and host-side
+  Horizon service replacements.
+- `nxnative`: NSO/module rewriting, Horizon service emulation, NVN/Vulkan/GL
+  translation, shader preparation, and Xcode/IPA generation.
+- `NX2Apple`: the ROMFSARC reader and packer used here. It keeps the IPA slim
+  and serves RomFS files from `Documents/romfs` through the host filesystem
+  layer, opening shards lazily.
 
 ## References
 

@@ -30,7 +30,9 @@ python scripts/stage_runner_inputs.py \
 ```
 
 Run `survey_only=true` first. Review the generated survey and provisional
-profile. After that succeeds, run the normal build. The IPA is kept on the
-self-hosted runner by default. `publish_ipa=true` is an explicit opt-in to
-upload the IPA as a public Actions artifact; the IPA contains the packed game
-files, so leave it false when the game data must stay local.
+profile. After that succeeds, run the normal build. The workflow uses the
+NX2Apple backend, so the IPA is slim and the merged RomFS is packed locally as
+ROMFSARC shards. Copy the generated `romfs.idx` and shards into the installed
+app's `Documents/romfs/` directory. The IPA is kept on the self-hosted runner
+by default. `publish_ipa=true` is an explicit opt-in to upload the slim IPA as
+a public Actions artifact; the ROMFSARC data is never uploaded.
