@@ -32,6 +32,7 @@ def check_contract_files() -> dict:
         "scripts/stage_runner_inputs.py",
         "scripts/pack_romfs_for_iphone.py",
         "scripts/normalize_switch_inputs.py",
+        "scripts/summarize_profile_guess.py",
     ]
     missing = [item for item in required if not (ROOT / item).is_file()]
     if missing:
