@@ -1,6 +1,8 @@
 name: Build Torchlight II IPA
 
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
     inputs:
       survey_only:
@@ -37,6 +39,7 @@ jobs:
           git diff --check
 
   build:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     needs: portable
     # The runner owner mounts the local dump and keys. Hosted runners are not
     # used because game resources must remain local to the owner.
