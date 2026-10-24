@@ -71,7 +71,7 @@ or run the wrapper directly:
 
 ```bash
 python scripts/build_local_ipa.py \
-  --resources /path/to/Gamedata \
+  --resources /path/to/Normalized \
   --keys /path/to/prod.keys \
   --out /path/to/TorchlightIIMobile.ipa
 ```
