@@ -50,7 +50,7 @@ jobs:
       - name: Validate public tree
         run: python3 scripts/validate_public_tree.py
 
-      - name: Install nxnative dependencies
+      - name: Install NX2Apple/nxnative dependencies
         run: |
           brew install xcodegen zstd spirv-cross glslang
           brew install --cask dotnet-sdk
