@@ -90,6 +90,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TORCHLIGHT2_RESOURCE_KEY: ${{ secrets.TORCHLIGHT2_RESOURCE_KEY }}
           TORCHLIGHT2_PROD_KEYS: ${{ secrets.TORCHLIGHT2_PROD_KEYS }}
+          TL2_DEBUG_JUMPTABLE: "1"
         run: |
           test -n "$TORCHLIGHT2_RESOURCE_KEY"
           test -n "$TORCHLIGHT2_PROD_KEYS"
