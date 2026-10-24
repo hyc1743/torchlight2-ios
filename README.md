@@ -45,6 +45,15 @@ The manifest does not contain key material. It only records the source file
 names, part names, sizes, and hashes. `assemble_resources.py` refuses path
 traversal and verifies every part before writing a reconstructed file.
 
+To prepare a self-hosted runner without printing key contents:
+
+```bash
+python scripts/stage_runner_inputs.py \
+  --parts /path/to/resource-parts \
+  --keys /path/to/prod.keys \
+  --runner-temp "$RUNNER_TEMP"
+```
+
 ## Build on a Mac
 
 `nxnative` needs Xcode, the Metal toolchain, .NET, and its documented Homebrew

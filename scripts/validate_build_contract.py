@@ -29,6 +29,7 @@ def check_contract_files() -> dict:
         "scripts/build_local_ipa.py",
         "scripts/validate_public_tree.py",
         "scripts/validate_ipa.py",
+        "scripts/stage_runner_inputs.py",
     ]
     missing = [item for item in required if not (ROOT / item).is_file()]
     if missing:
