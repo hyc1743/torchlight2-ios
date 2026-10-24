@@ -9,7 +9,7 @@ on:
         default: false
         type: boolean
       publish_ipa:
-        description: Upload the IPA to the public Actions artifact (default keeps it on the local runner)
+        description: Upload the slim IPA to the public Actions artifact (default keeps it on the local runner)
         required: false
         default: false
         type: boolean
