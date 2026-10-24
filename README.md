@@ -106,11 +106,10 @@ on that runner. The workflow expects these local paths:
 - `$RUNNER_TEMP/torchlight2-prod.keys`: the user's local `prod.keys`
 
 The job reconstructs the archives inside the runner's temporary directory and
-never uploads the split paths or their contents. By default the IPA also
-stays on the self-hosted runner; the workflow prints its local path. A separate
-`publish_ipa` input can upload the IPA as a public Actions artifact only when
-you explicitly accept publishing the slim executable package. The generated
-ROMFSARC shards stay on the runner. Do not replace this with a hosted runner
+never uploads the split paths or their contents. The `publish_ipa` input
+defaults to uploading the slim IPA as a public Actions artifact; set it to
+`false` to keep the executable local. The generated ROMFSARC shards stay on
+the runner. Do not replace this with a hosted runner
 plus an uploaded game archive: that would publish proprietary game resources
 outside the local boundary.
 

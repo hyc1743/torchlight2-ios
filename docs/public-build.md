@@ -33,6 +33,6 @@ Run `survey_only=true` first. Review the generated survey and provisional
 profile. After that succeeds, run the normal build. The workflow uses the
 NX2Apple backend, so the IPA is slim and the merged RomFS is packed locally as
 ROMFSARC shards. Copy the generated `romfs.idx` and shards into the installed
-app's `Documents/romfs/` directory. The IPA is kept on the self-hosted runner
-by default. `publish_ipa=true` is an explicit opt-in to upload the slim IPA as
-a public Actions artifact; the ROMFSARC data is never uploaded.
+app's `Documents/romfs/` directory. `publish_ipa` defaults to uploading the
+slim IPA as a public Actions artifact; set it to `false` to keep the executable
+local. The ROMFSARC data is never uploaded.
