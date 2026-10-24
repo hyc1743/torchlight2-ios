@@ -37,6 +37,7 @@ On the machine that owns the game dump:
 
 ```powershell
 python scripts/split_resources.py Gamedata --output resource-parts
+python scripts/inspect_nsp_set.py Gamedata
 python scripts/assemble_resources.py resource-parts/manifest.json --output-dir .local/Gamedata
 ```
 
@@ -67,13 +68,15 @@ packing.
 ## Public GitHub Actions workflow
 
 The workflow in `.github/workflows/build-ipa.yml` runs only on a self-hosted
-macOS runner. It expects the runner to expose two local environment variables:
+macOS runner. Before dispatching it, place the local split directory and keys
+on that runner. The workflow expects these local paths:
 
-- `TORCHLIGHT2_RESOURCES`: a directory containing the base NSP, update NSZ,
-  and optional DLC NSP
+- `$RUNNER_TEMP/torchlight2-resource-parts`: a copy of the local
+  `resource-parts/` directory containing `manifest.json` and all parts
 - `TORCHLIGHT2_KEYS`: a path to the user's local `prod.keys`
 
-The job never uploads those paths or their contents. By default the IPA also
+The job reconstructs the archives inside the runner's temporary directory and
+never uploads the split paths or their contents. By default the IPA also
 stays on the self-hosted runner; the workflow prints its local path. A separate
 `publish_ipa` input can upload the IPA as a public Actions artifact only when
 you explicitly accept that the IPA contains game data. Do not replace this

@@ -36,12 +36,13 @@ jobs:
 
       - name: Build from local resources
         env:
-          TORCHLIGHT2_RESOURCES: ${{ runner.temp }}/torchlight2-resources
+          TORCHLIGHT2_PARTS: ${{ runner.temp }}/torchlight2-resource-parts
           TORCHLIGHT2_KEYS: ${{ runner.temp }}/torchlight2-prod.keys
         run: |
-          test -d "$TORCHLIGHT2_RESOURCES"
+          test -f "$TORCHLIGHT2_PARTS/manifest.json"
           test -f "$TORCHLIGHT2_KEYS"
-          args=(--resources "$TORCHLIGHT2_RESOURCES" --keys "$TORCHLIGHT2_KEYS" --out "$RUNNER_TEMP/TorchlightIIMobile.ipa")
+          python3 scripts/assemble_resources.py "$TORCHLIGHT2_PARTS/manifest.json" --output-dir "$RUNNER_TEMP/torchlight2-resources"
+          args=(--resources "$RUNNER_TEMP/torchlight2-resources" --keys "$TORCHLIGHT2_KEYS" --out "$RUNNER_TEMP/TorchlightIIMobile.ipa")
           if [ "${{ inputs.survey_only }}" = "true" ]; then args+=(--survey-only); fi
           python3 scripts/build_local_ipa.py "${args[@]}"
 

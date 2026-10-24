@@ -54,11 +54,10 @@ def main() -> int:
         str(keys),
         "--app-name",
         args.app_name,
-        "--progress",
-        "lines",
     ]
     if args.language:
-        command[command.index("--progress"):command.index("--progress")] = ["--language", args.language]
+        command.extend(["--language", args.language])
+    command.extend(["--progress", "lines"])
     if args.out:
         command.extend(["--out", str(args.out.expanduser().resolve())])
     if args.survey_only:
