@@ -219,6 +219,26 @@ index c4a25b4..a09cfed 100644
  
  // Directory listing: write the entries of directory <rel> ("" = root) into the caller's array.
  // Each entry gets its name and type; files also get their size. Returns the number written, or -1.
+diff --git a/dm/host/tests/t_romfs_arc.c b/dm/host/tests/t_romfs_arc.c
+index 82ac914..5141616 100644
+--- a/dm/host/tests/t_romfs_arc.c
++++ b/dm/host/tests/t_romfs_arc.c
+@@ -52,13 +52,13 @@ int main(int argc, char **argv) {
+                 CHECK((int64_t)size == e[i].size, "size '%s': %llu vs %lld", rel,
+                       (unsigned long long)size, (long long)e[i].size);
+                 char *buf = malloc(size ? size : 1);
+-                ssize_t r = romfsarc_pread(shard, off, buf, size);
++                ssize_t r = romfsarc_pread_file(rel, 0, buf, size);
+                 CHECK(r == (ssize_t)size, "read '%s': %zd vs %llu", rel, r, (unsigned long long)size);
+                 // A read past this file's end lands in the next file's bytes: the archive is a flat
+                 // container, so the reader must not fabricate zeros. The fs layer clamps to the file
+                 // size (see h_fs_ReadFile), so this only checks the reader does not fail outright.
+                 char extra[16];
+-                ssize_t r2 = romfsarc_pread(shard, off + size, extra, sizeof extra);
++                ssize_t r2 = romfsarc_pread_file(rel, size, extra, sizeof extra);
+                 CHECK(r2 >= 0, "read past end of '%s' errored: %zd", rel, r2);
+                 free(buf);
+                 checked++;
 diff --git a/dm/tools/romfs_arc.py b/dm/tools/romfs_arc.py
 index 000cb4c..953fdc0 100644
 --- a/dm/tools/romfs_arc.py

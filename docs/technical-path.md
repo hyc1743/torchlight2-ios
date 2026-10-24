@@ -18,6 +18,9 @@ The project uses the references for their implementation boundaries:
    The local patch extends ROMFSARC to version 2 so one logical file can span
    multiple shards; this is required because Torchlight II's `PAKS/DATA.PAK`
    is about 1.15 GiB while each delivery shard must stay below 512 MB.
+   The public macOS workflow compiles and runs NX2Apple's native reader test
+   against a synthetic file that crosses shard boundaries before building the
+   game.
 
 This repository therefore pins both the upstream `nxnative` fallback and the
 `NX2Apple` backend. `scripts/build_local_ipa.py` selects NX2Apple by default;

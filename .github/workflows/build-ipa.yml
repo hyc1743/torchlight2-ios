@@ -53,6 +53,24 @@ jobs:
       - name: Apply NX2Apple ROMFSARC segment patch
         run: python3 scripts/apply_nx2apple_patches.py
 
+      - name: Compile and run segmented ROMFSARC reader test
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          root = Path(os.environ['RUNNER_TEMP']) / 'romfs-reader-fixture'
+          (root / 'PAKS').mkdir(parents=True, exist_ok=True)
+          (root / 'MUSIC').mkdir(parents=True, exist_ok=True)
+          (root / 'PAKS' / 'DATA.PAK').write_bytes(bytes(range(251)) * 12000)
+          (root / 'MUSIC' / 'small.ogg').write_bytes(b'OggS' + bytes(range(127)) * 17)
+          PY
+          python3 scripts/pack_romfs_for_iphone.py --romfs "$RUNNER_TEMP/romfs-reader-fixture" --output "$RUNNER_TEMP/romfs-reader-archive" --shard-mib 1
+          clang -I vendor/nx2apple/dm/host \
+            vendor/nx2apple/dm/host/tests/t_romfs_arc.c \
+            vendor/nx2apple/dm/host/romfs_arc.c \
+            -lpthread -o "$RUNNER_TEMP/t_romfs_arc"
+          "$RUNNER_TEMP/t_romfs_arc" "$RUNNER_TEMP/romfs-reader-archive/romfs"
+
       - name: Install NX2Apple/nxnative dependencies
         run: |
           brew install xcodegen zstd spirv-cross glslang
