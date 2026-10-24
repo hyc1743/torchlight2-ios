@@ -7,6 +7,7 @@ current build. A generated IPA alone is not proof that the game runs.
 |---|---|---|
 | Local archive identity | Base, update, and optional DLC title IDs match the local dump | Done on Windows |
 | Input packaging | NSP/NSZ/DLC parts are <= 500,000,000 bytes; manifest and round-trip hashes verify | Done on Windows |
+| NSZ normalization | Update NSZ decompresses to a temporary verified NSP for nx_extract | Done on Windows |
 | Device resource packaging | NX2Apple ROMFSARC index + shards, each <=512 MB | Synthetic fixture done; real RomFS pending Mac extraction |
 | Public tree hygiene | No game archives, extracted content, or keys are tracked | Done |
 | Portable CI contract | Public tree, workflow, and split/restore checks pass on Ubuntu | Done |

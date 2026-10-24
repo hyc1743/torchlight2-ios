@@ -4,3 +4,6 @@
 [submodule "vendor/nx2apple"]
 	path = vendor/nx2apple
 	url = https://github.com/LNPANDY/NX2Apple.git
+[submodule "vendor/nsz"]
+	path = vendor/nsz
+	url = https://github.com/nicoboss/nsz.git

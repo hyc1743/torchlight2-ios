@@ -49,6 +49,8 @@ def main() -> int:
         raise SystemExit(f"resource directory does not exist: {resources}")
     if not keys.is_file():
         raise SystemExit(f"keys file does not exist: {keys}")
+    if any(resources.glob("*.nsz")):
+        raise SystemExit("NSZ input detected; run scripts/normalize_switch_inputs.py first")
     backend = find_backend(args.backend_dir, args.backend)
     command = [
         sys.executable,

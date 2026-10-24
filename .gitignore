@@ -18,6 +18,7 @@ romfs-parts/
 torchlight2-romfs/
 .local/
 *_build/
+*_survey/
 build/
 dist/
 *.ipa

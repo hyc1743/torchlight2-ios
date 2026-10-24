@@ -22,6 +22,10 @@ This repository therefore pins both the upstream `nxnative` fallback and the
 uses the NX2Apple backend, then runs `scripts/pack_romfs_for_iphone.py` with
 200 MiB shards and verifies the archive against the extracted RomFS.
 
+The local dump contains an NSZ update, so the workflow first runs
+`scripts/normalize_switch_inputs.py` (the pinned `nsz` tool) to produce a
+temporary NSP. The original NSZ remains untouched and stays in local storage.
+
 The profile and runtime bring-up remain game-specific. No profile is invented
 for Torchlight II before its Mac survey identifies the actual modules, SDK,
 graphics API, memory partition, and shader sources.

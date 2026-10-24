@@ -43,11 +43,14 @@ On the machine that owns the game dump:
 python scripts/split_resources.py Gamedata --output resource-parts
 python scripts/inspect_nsp_set.py Gamedata
 python scripts/assemble_resources.py resource-parts/manifest.json --output-dir .local/Gamedata
+python scripts/normalize_switch_inputs.py --resources .local/Gamedata --output .local/Normalized --keys prod.keys
 ```
 
 The manifest does not contain key material. It only records the source file
 names, part names, sizes, and hashes. `assemble_resources.py` refuses path
 traversal and verifies every part before writing a reconstructed file.
+`normalize_switch_inputs.py` converts NSZ updates to temporary NSP files because
+`nx_extract` consumes NSP/XCI inputs.
 
 To prepare a self-hosted runner without printing key contents:
 
@@ -60,8 +63,9 @@ python scripts/stage_runner_inputs.py \
 
 ## Build on a Mac
 
-`nxnative` needs Xcode, the Metal toolchain, .NET, and its documented Homebrew
-and Python dependencies. On a Mac, either use the public GitHub Actions
+NX2Apple needs Xcode, the Metal toolchain, .NET, and its documented Homebrew
+and Python dependencies, plus `zstandard`, `pycryptodome`, and `enlighten` for
+NSZ normalization. On a Mac, either use the public GitHub Actions
 workflow with a **self-hosted macOS runner** that has the local data mounted,
 or run the wrapper directly:
 
