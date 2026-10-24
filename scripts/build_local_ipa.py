@@ -52,6 +52,17 @@ def main() -> int:
     if any(resources.glob("*.nsz")):
         raise SystemExit("NSZ input detected; run scripts/normalize_switch_inputs.py first")
     backend = find_backend(args.backend_dir, args.backend)
+    if args.backend == "nx2apple":
+        subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("apply_nx2apple_patches.py")),
+                "--backend-dir",
+                str(backend),
+            ],
+            check=True,
+            cwd=Path(__file__).resolve().parents[1],
+        )
     command = [
         sys.executable,
         str(backend / "scripts" / "build_ipa_from_nsp.py"),

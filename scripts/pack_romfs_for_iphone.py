@@ -63,6 +63,16 @@ def main() -> int:
         raise SystemExit(f"output directory is not empty: {output}")
     output.mkdir(parents=True, exist_ok=True)
     tool = find_tool(args.backend_dir)
+    subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).with_name("apply_nx2apple_patches.py")),
+            "--backend-dir",
+            str(tool.parents[2]),
+        ],
+        check=True,
+        cwd=Path(__file__).resolve().parents[1],
+    )
     base = output / "romfs"
     command = [
         sys.executable,
@@ -94,7 +104,7 @@ def main() -> int:
         records.append({"name": path.name, "bytes": size, "sha256": sha})
     manifest = {
         "schema": 1,
-        "format": "nx2apple-romfsarc-v1",
+        "format": "nx2apple-romfsarc-v2",
         "shard_mib": args.shard_mib,
         "max_part_bytes": MAX_PART_BYTES,
         "parts": records,

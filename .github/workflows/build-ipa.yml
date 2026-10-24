@@ -50,6 +50,9 @@ jobs:
       - name: Validate public tree
         run: python3 scripts/validate_public_tree.py
 
+      - name: Apply NX2Apple ROMFSARC segment patch
+        run: python3 scripts/apply_nx2apple_patches.py
+
       - name: Install NX2Apple/nxnative dependencies
         run: |
           brew install xcodegen zstd spirv-cross glslang

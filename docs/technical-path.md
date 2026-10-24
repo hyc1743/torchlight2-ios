@@ -15,6 +15,9 @@ The project uses the references for their implementation boundaries:
    `dm/host/romfs_arc.c/.h`, and filesystem routing in `hle_fs.c`. The iOS
    entry point accepts `Documents/romfs/romfs.idx` plus numbered shards, and
    `build_ipa.sh` produces a slim IPA unless `DM_FULL_ROMFS=1` is set.
+   The local patch extends ROMFSARC to version 2 so one logical file can span
+   multiple shards; this is required because Torchlight II's `PAKS/DATA.PAK`
+   is about 1.15 GiB while each delivery shard must stay below 512 MB.
 
 This repository therefore pins both the upstream `nxnative` fallback and the
 `NX2Apple` backend. `scripts/build_local_ipa.py` selects NX2Apple by default;

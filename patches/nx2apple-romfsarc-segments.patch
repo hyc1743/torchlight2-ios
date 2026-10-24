@@ -1,0 +1,446 @@
+diff --git a/dm/host/hle_fs.c b/dm/host/hle_fs.c
+index 3a754ad..07f5498 100644
+--- a/dm/host/hle_fs.c
++++ b/dm/host/hle_fs.c
+@@ -599,13 +599,14 @@ HLE_FORCE("_ZN2nn2fs7UnmountEPKc", "fsp-srv; the mount table is permanent, unmou
+ // An archive file has no host fd. It gets a handle number from a private table, and every operation
+ // on it (ReadFile, GetFileSize, CloseFile) checks the table first. Handle numbers are distinct from
+ // fds: real handles are fds (>= 3 in practice), archive handles are tagged by index into g_arc[].
+-typedef struct { uint32_t shard; uint64_t off, size; int used; } archandle;
++typedef struct { uint32_t shard; uint64_t off, size; char rel[1024]; int used; } archandle;
+ #define MAX_ARCH 4096
+ static archandle g_arc[MAX_ARCH];
+ static uint64_t g_arch_gen;   // bumped on open/close so a stale handle never hits a recycled slot
+-static uint64_t arc_new(uint32_t shard, uint64_t off, uint64_t size) {
++static uint64_t arc_new(const char *rel, uint32_t shard, uint64_t off, uint64_t size) {
+     for (int i = 0; i < MAX_ARCH; i++) if (!g_arc[i].used) {
+         g_arc[i].used = 1; g_arc[i].shard = shard; g_arc[i].off = off; g_arc[i].size = size;
++        strlcpy(g_arc[i].rel, rel, sizeof g_arc[i].rel);
+         return ((uint64_t)1 << 63) | ((g_arch_gen & 0x7fffffff) << 32) | (uint32_t)i;
+     }
+     return 0;
+@@ -636,7 +637,7 @@ HLE_FORCE("_ZN2nn2fs8OpenFileEPNS0_10FileHandleEPKci", "fsp-srv → open(2)", Re
+     if (ROMFSARC_IS_SYNTH(hp)) {   // archive entry: no fd, the handle carries shard/offset/size
+         uint32_t shard; uint64_t off, size;
+         if (!arc_file(hp, &shard, &off, &size)) { errno = ENOENT; return err_res("open", hp); }
+-        uint64_t ah = arc_new(shard, off, size);
++        uint64_t ah = arc_new(arc_rel(hp), shard, off, size);
+         if (!ah) { errno = EMFILE; return err_res("open", hp); }
+         *out = ah;
+         if (g_flag.fs) LOG("fs open %s mode=%d → archive handle (shard %u off %llu size %llu)", path, mode, shard, (unsigned long long)off, (unsigned long long)size);
+@@ -664,7 +665,7 @@ HLE_FORCE("_ZN2nn2fs8ReadFileEPmNS0_10FileHandleElPvm", "fsp-srv → pread(2)",
+         if (off < 0) { *out = 0; return RES_FAIL; }
+         uint64_t avail = (uint64_t)off < ah->size ? ah->size - (uint64_t)off : 0;
+         size_t want = sz < avail ? sz : (size_t)avail;
+-        if (want) { ssize_t r = romfsarc_pread(ah->shard, ah->off + (uint64_t)off, buf, want);
++        if (want) { ssize_t r = romfsarc_pread_file(ah->rel, (uint64_t)off, buf, want);
+             if (r < 0) return err_res("pread (archive)", "handle"); got = (size_t)r; }
+         *out = got;
+         if (g_flag.fs) { static uint64_t n, bytes, next_b = 64 << 20; static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+diff --git a/dm/host/romfs_arc.c b/dm/host/romfs_arc.c
+index a8fe045..6319876 100644
+--- a/dm/host/romfs_arc.c
++++ b/dm/host/romfs_arc.c
+@@ -16,6 +16,11 @@ typedef struct {
+     uint32_t mode, res;
+ } filerec;
+ 
++typedef struct {
++    uint32_t shard, res;
++    uint64_t off, size;
++} segrec;
++
+ typedef struct {
+     uint32_t name_off, first_child, child_count, res;
+ } dirrec;
+@@ -29,6 +34,7 @@ static struct {
+     const filerec *files;
+     const dirrec *dirs;
+     const uint32_t *children;
++    const segrec *segments;
+     char base[1024];
+     int shard_fd[256];
+     char shard_path[256][1024];
+@@ -78,7 +84,7 @@ static void *map_index(const char *path, size_t *size) {
+     close(fd);
+     if (m == MAP_FAILED) return MAP_FAILED;
+     const uint8_t *b = m;
+-    if (memcmp(b, ROMFSARC_MAGIC, 8) || rd32(b + 8) != ROMFSARC_VERSION) {
++    if (memcmp(b, ROMFSARC_MAGIC, 8) || (rd32(b + 8) != 1u && rd32(b + 8) != ROMFSARC_VERSION)) {
+         munmap(m, (size_t)st.st_size); errno = EINVAL; return MAP_FAILED;
+     }
+     *size = (size_t)st.st_size;
+@@ -109,22 +115,39 @@ int romfsarc_open(const char *base, romfsarc_hdr *out) {
+     size_t ul = strlen(used); if (ul > 4) used[ul - 4] = 0;
+     const uint8_t *b = m;
+     romfsarc_hdr h;
++    h.version = rd32(b + 8);
+     h.shard_count = rd32(b + 12);
++    uint64_t segment_offset = rd64(b + 16);
+     h.file_count = rd64(b + 24);
+     h.dir_count = rd64(b + 32);
++    h.segment_count = rd64(b + 48);
+     h.tree_hash = rd64(b + 56);
+     if (h.shard_count == 0 || h.shard_count > 256) { munmap(m, sz); errno = EINVAL; return -1; }
+     uint64_t pool_sz = rd64(b + 40);
+     uint64_t need = ROMFSARC_HDR + pool_sz + h.file_count * ROMFSARC_FILEREC + h.dir_count * ROMFSARC_DIRREC;
+     // The child list follows the directory table; its length is implied by the last directory's range,
+     // so the file only has to be at least as long as the three tables above.
+-    if (need > (uint64_t)sz) { munmap(m, sz); errno = EINVAL; return -1; }
++    uint64_t child_count = 0;
++    if (h.dir_count) {
++        const dirrec *dt = (const dirrec *)(b + ROMFSARC_HDR + pool_sz + h.file_count * ROMFSARC_FILEREC);
++        for (uint64_t i = 0; i < h.dir_count; i++) {
++            uint64_t end = (uint64_t)dt[i].first_child + dt[i].child_count;
++            if (end > child_count) child_count = end;
++        }
++    }
++    uint64_t child_end = need + child_count * sizeof(uint32_t);
++    uint64_t seg_base = h.version >= 2 ? segment_offset : child_end;
++    if (need > (uint64_t)sz || child_end > (uint64_t)sz || seg_base < child_end ||
++        seg_base + h.segment_count * ROMFSARC_SEGREC > (uint64_t)sz) {
++        munmap(m, sz); errno = EINVAL; return -1;
++    }
+     pthread_mutex_lock(&A.lock);
+     A.open = 1; A.idx = m; A.idx_size = sz; A.hdr = h;
+     A.pool = (const char *)(b + ROMFSARC_HDR);
+     A.files = (const filerec *)(b + ROMFSARC_HDR + pool_sz);
+     A.dirs = (const dirrec *)((const uint8_t *)A.files + h.file_count * ROMFSARC_FILEREC);
+     A.children = (const uint32_t *)((const uint8_t *)A.dirs + h.dir_count * ROMFSARC_DIRREC);
++    A.segments = (const segrec *)(b + seg_base);
+     for (int i = 0; i < 256; i++) { A.shard_fd[i] = -1; A.shard_path[i][0] = 0; }
+     // Shards are named after the index file's own base, so <dir>/romfs.idx pairs with <dir>/romfs.00
+     strlcpy(A.base, used, sizeof A.base);
+@@ -180,6 +203,31 @@ ssize_t romfsarc_pread(uint32_t shard, uint64_t off, void *buf, size_t n) {
+     return (ssize_t)done;
+ }
+ 
++ssize_t romfsarc_pread_file(const char *rel, uint64_t off, void *buf, size_t n) {
++    if (!A.open) { errno = ENOENT; return -1; }
++    const filerec *f = find_file(rel);
++    if (!f || off >= f->size) return 0;
++    uint64_t avail = f->size - off;
++    if ((uint64_t)n > avail) n = (size_t)avail;
++    if (!f->res) return romfsarc_pread(f->shard, f->off + off, buf, n);
++    size_t done = 0;
++    uint64_t logical = 0;
++    for (uint32_t i = 0; i < f->res && done < n; i++) {
++        const segrec *s = &A.segments[f->shard + i];
++        uint64_t seg_end = logical + s->size;
++        if (off >= seg_end) { logical = seg_end; continue; }
++        uint64_t in = off > logical ? off - logical : 0;
++        size_t take = (size_t)(s->size - in);
++        if (take > n - done) take = n - done;
++        ssize_t got = romfsarc_pread(s->shard, s->off + in, (uint8_t *)buf + done, take);
++        if (got < 0) return -1;
++        done += (size_t)got;
++        logical = seg_end;
++        if ((size_t)got != take) break;
++    }
++    return (ssize_t)done;
++}
++
+ int romfsarc_list(const char *rel, romfsarc_ent *out, int max) {
+     if (!A.open) return -1;
+     const dirrec *d = find_dir(rel);
+diff --git a/dm/host/romfs_arc.h b/dm/host/romfs_arc.h
+index c4a25b4..a09cfed 100644
+--- a/dm/host/romfs_arc.h
++++ b/dm/host/romfs_arc.h
+@@ -5,22 +5,24 @@
+ // (PackageExtractionFailed). Packing the tree into ~100 shard files makes both a single copy.
+ //
+ // Layout (all integers little-endian):
+-//   <base>.idx   header, name pool, file table, directory table
++//   <base>.idx   header, name pool, file table, directory table, child list, segment table
+ //   <base>.<NN>  shard NN: the files' bytes back to back, in file-table order
+ //
+ // Header (64 bytes):
+ //   0x00  char     magic[8]      "ROMFSARC"
+-//   0x08  uint32   version       1
++//   0x08  uint32   version       1 (legacy) or 2 (files may span shards)
+ //   0x0c  uint32   shard_count
+-//   0x10  uint64   index_size    size of this index file
++//   0x10  uint64   segment_offset (v2; absolute offset of segment table)
+ //   0x18  uint64   file_count
+ //   0x20  uint64   dir_count
+ //   0x28  uint64   name_pool_size
+-//   0x30  uint64   reserved
++//   0x30  uint64   segment_count (v2; total segment records)
+ //   0x38  uint64   tree_hash      FNV-1a over (path, size) of every file, sorted: a cheap identity check
+ //
+ // File table: file_count records of 32 bytes, sorted by path (the name pool offset points at the
+-//             NUL-terminated relative path, '/'-separated, no leading slash):
++//             NUL-terminated relative path, '/'-separated, no leading slash). In v2, reserved=0
++//             is a direct record; reserved>0 stores the first segment index in shard and the
++//             segment count in reserved:
+ //   0x00  uint32   name_off
+ //   0x04  uint32   shard
+ //   0x08  uint64   offset_in_shard
+@@ -35,6 +37,7 @@
+ //   0x0c  uint32   reserved
+ // Child list: uint32 file-table / directory-table indices, each tagged: bit 31 set = a directory.
+ //            Children of one directory are contiguous and sorted by name.
++// Segment table (v2): 24-byte records {uint32 shard, uint32 reserved, uint64 offset, uint64 length}.
+ //
+ // Path lookup is a binary search over the sorted tables; directory listing walks one child range.
+ // Case sensitivity: Horizon paths are case-sensitive and the archive is built from a case-sensitive
+@@ -48,10 +51,11 @@
+ #include <sys/types.h>
+ 
+ #define ROMFSARC_MAGIC "ROMFSARC"
+-#define ROMFSARC_VERSION 1u
++#define ROMFSARC_VERSION 2u
+ #define ROMFSARC_HDR 64
+ #define ROMFSARC_FILEREC 32
+ #define ROMFSARC_DIRREC 16
++#define ROMFSARC_SEGREC 24
+ #define ROMFSARC_CHILD_DIR 0x80000000u
+ 
+ // Synthetic host path prefix for archive-backed entries (see host_path_ex in hle_fs.c). A path that
+@@ -61,8 +65,10 @@
+ #define ROMFSARC_SYNTH_REL(p) ((p) + sizeof ROMFSARC_SYNTH_PREFIX - 1)
+ 
+ typedef struct {
++    uint32_t version;
+     uint32_t shard_count;
+     uint64_t file_count, dir_count;
++    uint64_t segment_count;
+     uint64_t tree_hash;
+ } romfsarc_hdr;
+ 
+@@ -86,6 +92,9 @@ int romfsarc_is_dir(const char *rel);
+ 
+ // Read from an open archive file. Same semantics as pread.
+ ssize_t romfsarc_pread(uint32_t shard, uint64_t off, void *buf, size_t n);
++// Read a logical file range. Version 2 archives may split one logical file
++// across several shards; this call hides those physical segments.
++ssize_t romfsarc_pread_file(const char *rel, uint64_t off, void *buf, size_t n);
+ 
+ // Directory listing: write the entries of directory <rel> ("" = root) into the caller's array.
+ // Each entry gets its name and type; files also get their size. Returns the number written, or -1.
+diff --git a/dm/tools/romfs_arc.py b/dm/tools/romfs_arc.py
+index 000cb4c..953fdc0 100644
+--- a/dm/tools/romfs_arc.py
++++ b/dm/tools/romfs_arc.py
+@@ -24,7 +24,7 @@ import struct
+ import sys
+ 
+ MAGIC = b"ROMFSARC"
+-VERSION = 1
++VERSION = 2
+ HDR = 64
+ FILEREC = 32
+ DIRREC = 16
+@@ -62,24 +62,35 @@ def walk(root):
+ 
+ 
+ def plan_shards(files, shard_bytes):
+-    """Assign every file a shard. Files are grouped by top-level directory, keeping the walk order
+-    (path order) inside a group; a group is cut into shards of at most shard_bytes."""
++    """Assign every file one or more shard segments.
++
++    Files stay in path order within a top-level group, but a single large file
++    may cross shard boundaries. This is required for games such as Torchlight
++    II whose PAK/DATA.PAK is larger than the 512 MB delivery limit.
++    """
+     by_top = collections.OrderedDict()
+     for rel, size in files:
+         top = rel.split("/", 1)[0]
+         by_top.setdefault(top, []).append((rel, size))
+     # Big groups first, so the shard count stays close to the size total / shard_bytes
+     order = sorted(by_top.items(), key=lambda kv: -sum(s for _, s in kv[1]))
+-    assign, shard = {}, 0
++    assign, shard, cur = {}, 0, 0
+     for top, items in order:
+-        cur = 0
+         for rel, size in items:
+-            if cur and cur + size > shard_bytes:
+-                shard += 1
+-                cur = 0
+-            assign[rel] = (shard, cur)
+-            cur += size
+-        shard += 1
++            remaining, source_off, segments = size, 0, []
++            while remaining:
++                if cur == shard_bytes:
++                    shard += 1
++                    cur = 0
++                take = min(remaining, shard_bytes - cur)
++                segments.append((shard, cur, source_off, take))
++                cur += take
++                source_off += take
++                remaining -= take
++            assign[rel] = segments
++        if cur:
++            shard += 1
++            cur = 0
+     return assign, shard
+ 
+ 
+@@ -91,25 +102,28 @@ def pack(romfs, base, shard_mib):
+     assign, nshard = plan_shards(files, shard_bytes)
+     print(f"pack: {nshard} shards of at most {shard_mib} MiB", flush=True)
+ 
+-    # Shard files: written in path order within each shard
++    # Shard files: written in path order within each shard. A source file may
++    # contribute multiple segments when it exceeds the shard limit.
+     per_shard = collections.defaultdict(list)
+     for rel, size in files:
+-        per_shard[assign[rel][0]].append((rel, size))
++        for shard, shard_off, source_off, length in assign[rel]:
++            per_shard[shard].append((rel, source_off, length))
+     os.makedirs(os.path.dirname(base) or ".", exist_ok=True)
+     written = 0
+     for i in range(nshard):
+         path = f"{base}.{i:02d}"
+         with open(path, "wb") as out:
+-            for rel, size in sorted(per_shard[i]):
++            for rel, source_off, length in sorted(per_shard[i]):
+                 with open(os.path.join(romfs, rel), "rb") as f:
+-                    left = size
++                    f.seek(source_off)
++                    left = length
+                     while left:
+                         buf = f.read(min(left, 1 << 22))
+                         if not buf:
+                             sys.exit(f"[RED] {rel}: file shrank while packing")
+                         out.write(buf)
+                         left -= len(buf)
+-                written += size
++                written += length
+         print(f"\r  shard {i + 1}/{nshard}: {os.path.getsize(path) / 2**20:.0f} MiB", end="", flush=True)
+     print(f"\n  wrote {written / 2**30:.2f} GiB in {nshard} shards", flush=True)
+ 
+@@ -128,13 +142,23 @@ def pack(romfs, base, shard_mib):
+     for d in dirs:
+         intern(d)
+ 
+-    # File table (sorted by path, same order as `files`)
++    # File table (sorted by path, same order as `files`). A record with
++    # reserved=0 is a legacy/direct record. A record with reserved>0 stores
++    # the first segment index in shard and the segment count in reserved.
+     file_idx = {}
++    segment_records = []
+     ftab = bytearray()
+     for n, (rel, size) in enumerate(files):
+         file_idx[rel] = n
+-        shard, off = assign[rel]
+-        ftab += struct.pack("<IIQQII", intern(rel), shard, off, size, 0o644, 0)
++        segments = assign[rel]
++        if len(segments) == 1:
++            shard, off, source_off, length = segments[0]
++            assert source_off == 0 and length == size
++            ftab += struct.pack("<IIQQII", intern(rel), shard, off, size, 0o644, 0)
++        else:
++            first = len(segment_records)
++            segment_records.extend((shard, off, length) for shard, off, _source_off, length in segments)
++            ftab += struct.pack("<IIQQII", intern(rel), first, 0, size, 0o644, len(segments))
+ 
+     # Directory table + child list. A directory's children are its immediate files and directories,
+     # sorted by name, contiguous in the child list.
+@@ -163,13 +187,17 @@ def pack(romfs, base, shard_mib):
+     tree_hash = fnv1a(tree)
+ 
+     idx_path = f"{base}.idx"
++    child_blob = struct.pack(f"<{len(child_list)}I", *child_list) if child_list else b""
++    segment_offset = HDR + len(pool) + len(ftab) + len(dtab) + len(child_blob)
++    segment_blob = b"".join(struct.pack("<IIQQ", shard, 0, off, length) for shard, off, length in segment_records)
+     with open(idx_path, "wb") as out:
+-        out.write(struct.pack("<8sIIQQQQQQ", MAGIC, VERSION, nshard, 0, len(files), len(dirs),
+-                              len(pool), 0, tree_hash))
++        out.write(struct.pack("<8sIIQQQQQQ", MAGIC, VERSION, nshard, segment_offset, len(files), len(dirs),
++                              len(pool), len(segment_records), tree_hash))
+         out.write(pool)
+         out.write(ftab)
+         out.write(dtab)
+-        out.write(struct.pack(f"<{len(child_list)}I", *child_list) if child_list else b"")
++        out.write(child_blob)
++        out.write(segment_blob)
+     print(f"pack: index {os.path.getsize(idx_path) / 2**20:.1f} MiB ({len(pool) / 2**20:.1f} MiB names, "
+           f"{len(files):,} files, {len(dirs):,} directories), tree hash {tree_hash:016x}", flush=True)
+     print(f"pack: total {nshard + 1} files", flush=True)
+@@ -178,16 +206,16 @@ def pack(romfs, base, shard_mib):
+ def load(base):
+     with open(f"{base}.idx", "rb") as f:
+         b = f.read()
+-    magic, ver, nshard, _pad, nfiles, ndirs, pool_sz, _r, tree_hash = struct.unpack_from("<8sIIQQQQQQ", b, 0)
+-    if magic != MAGIC or ver != VERSION:
++    magic, ver, nshard, segment_offset, nfiles, ndirs, pool_sz, segment_count, tree_hash = struct.unpack_from("<8sIIQQQQQQ", b, 0)
++    if magic != MAGIC or ver not in (1, VERSION):
+         sys.exit("[RED] not a ROMFSARC index")
+     pool = b[HDR:HDR + pool_sz]
+     off = HDR + pool_sz
+     files = []
+     for i in range(nfiles):
+-        name_off, shard, foff, size, mode, _ = struct.unpack_from("<IIQQII", b, off + i * FILEREC)
++        name_off, shard, foff, size, mode, reserved = struct.unpack_from("<IIQQII", b, off + i * FILEREC)
+         name = pool[name_off:pool.index(b"\0", name_off)].decode()
+-        files.append((name, shard, foff, size))
++        files.append((name, shard, foff, size, reserved))
+     off += nfiles * FILEREC
+     dirs = []
+     for i in range(ndirs):
+@@ -195,8 +223,28 @@ def load(base):
+         name = pool[name_off:pool.index(b"\0", name_off)].decode()
+         dirs.append((name, first, count))
+     off += ndirs * DIRREC
+-    kids = struct.unpack_from(f"<{len(b) - off >> 2}I", b, off) if len(b) > off else ()
+-    return dict(nshard=nshard, files=files, dirs=dirs, kids=kids, tree_hash=tree_hash)
++    child_count = max((first + count for _name, first, count in dirs), default=0)
++    child_end = off + child_count * 4
++    segment_base = segment_offset if ver >= 2 else child_end
++    if segment_base < child_end or segment_base + segment_count * 24 > len(b):
++        sys.exit("[RED] invalid ROMFSARC segment table")
++    kids = struct.unpack_from(f"<{child_count}I", b, off) if child_count else ()
++    segments = [struct.unpack_from("<IIQQ", b, segment_base + i * 24) for i in range(segment_count)]
++    return dict(nshard=nshard, files=files, dirs=dirs, kids=kids, tree_hash=tree_hash, version=ver, segments=segments)
++
++
++def read_file(a, base, record):
++    name, shard, foff, size, count = record
++    if not count:
++        with open(f"{base}.{shard:02d}", "rb") as f:
++            f.seek(foff)
++            return f.read(size)
++    out = bytearray()
++    for seg_shard, _reserved, seg_off, seg_len in a["segments"][shard:shard + count]:
++        with open(f"{base}.{seg_shard:02d}", "rb") as f:
++            f.seek(seg_off)
++            out.extend(f.read(seg_len))
++    return bytes(out)
+ 
+ 
+ def cmd_list(base, path):
+@@ -211,15 +259,17 @@ def cmd_list(base, path):
+         if k & CHILD_DIR:
+             print(f"  d  {a['dirs'][k & ~CHILD_DIR][0].rpartition('/')[2]}/")
+         else:
+-            name, shard, off, size = a["files"][k]
+-            print(f"  f  {name.rpartition('/')[2]:50} {size:12,}  shard {shard:3} off {off:,}")
++            name, shard, off, size, count = a["files"][k]
++            detail = f"segments {count}" if count else f"shard {shard:3} off {off:,}"
++            print(f"  f  {name.rpartition('/')[2]:50} {size:12,}  {detail}")
+ 
+ 
+ def cmd_verify(base, romfs):
+     a = load(base)
+     print(f"verify: {len(a['files']):,} files")
+     bad = 0
+-    for n, (rel, shard, off, size) in enumerate(a["files"]):
++    for n, record in enumerate(a["files"]):
++        rel, shard, off, size, count = record
+         src = os.path.join(romfs, rel)
+         try:
+             with open(src, "rb") as f:
+@@ -232,9 +282,7 @@ def cmd_verify(base, romfs):
+             print(f"[RED] size mismatch {rel}: source {len(want)} archive {size}")
+             bad += 1
+             continue
+-        with open(f"{base}.{shard:02d}", "rb") as f:
+-            f.seek(off)
+-            got = f.read(size)
++        got = read_file(a, base, record)
+         if got != want:
+             print(f"[RED] content mismatch {rel}")
+             bad += 1

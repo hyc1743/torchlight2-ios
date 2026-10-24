@@ -33,6 +33,7 @@ def check_contract_files() -> dict:
         "scripts/pack_romfs_for_iphone.py",
         "scripts/normalize_switch_inputs.py",
         "scripts/summarize_profile_guess.py",
+        "scripts/apply_nx2apple_patches.py",
     ]
     missing = [item for item in required if not (ROOT / item).is_file()]
     if missing:
@@ -57,6 +58,8 @@ def check_contract_files() -> dict:
         raise ValueError("NX2Apple ROMFSARC tool is missing")
     if not (ROOT / "vendor" / "nsz" / "nsz.py").is_file():
         raise ValueError("NSZ normalization tool is missing")
+    if not (ROOT / "patches" / "nx2apple-romfsarc-segments.patch").is_file():
+        raise ValueError("NX2Apple ROMFSARC segment patch is missing")
     return {"required_files": len(required), "workflow_contract": True}
 
 
