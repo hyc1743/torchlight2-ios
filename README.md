@@ -73,7 +73,7 @@ on that runner. The workflow expects these local paths:
 
 - `$RUNNER_TEMP/torchlight2-resource-parts`: a copy of the local
   `resource-parts/` directory containing `manifest.json` and all parts
-- `TORCHLIGHT2_KEYS`: a path to the user's local `prod.keys`
+- `$RUNNER_TEMP/torchlight2-prod.keys`: the user's local `prod.keys`
 
 The job reconstructs the archives inside the runner's temporary directory and
 never uploads the split paths or their contents. By default the IPA also
