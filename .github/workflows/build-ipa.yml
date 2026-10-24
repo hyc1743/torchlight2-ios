@@ -14,8 +14,30 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
 jobs:
+  portable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout public source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate public build contract
+        run: |
+          python -m py_compile scripts/*.py
+          python scripts/validate_build_contract.py
+          git diff --check
+
   build:
+    needs: portable
     # The runner owner mounts the local dump and keys. Hosted runners are not
     # used because game resources must remain local to the owner.
     runs-on: [self-hosted, macOS, ARM64, torchlight2-local]
@@ -45,6 +67,10 @@ jobs:
           args=(--resources "$RUNNER_TEMP/torchlight2-resources" --keys "$TORCHLIGHT2_KEYS" --out "$RUNNER_TEMP/TorchlightIIMobile.ipa")
           if [ "${{ inputs.survey_only }}" = "true" ]; then args+=(--survey-only); fi
           python3 scripts/build_local_ipa.py "${args[@]}"
+
+      - name: Validate IPA structure
+        if: ${{ !inputs.survey_only }}
+        run: python3 scripts/validate_ipa.py "$RUNNER_TEMP/TorchlightIIMobile.ipa"
 
       - name: Upload optional public artifact
         if: ${{ !inputs.survey_only && inputs.publish_ipa }}

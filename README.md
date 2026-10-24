@@ -83,6 +83,13 @@ you explicitly accept that the IPA contains game data. Do not replace this
 with a hosted runner plus an uploaded game archive: that would publish
 proprietary game resources outside the local boundary.
 
+Every workflow dispatch first runs the portable Ubuntu validation job. It
+checks the public tree, the workflow contract, and a synthetic split/restore
+round trip before the macOS job is allowed to use the local dump.
+After an IPA build, the workflow validates its ZIP/Payload layout, Info.plist,
+Mach-O executable, and rejects embedded NSP/NSZ/key files before any optional
+artifact upload.
+
 ## References
 
 - [nxnative](https://github.com/seedds/nxnative)
