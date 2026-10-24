@@ -29,3 +29,8 @@ temporary NSP. The original NSZ remains untouched and stays in local storage.
 The profile and runtime bring-up remain game-specific. No profile is invented
 for Torchlight II before its Mac survey identifies the actual modules, SDK,
 graphics API, memory partition, and shader sources.
+
+The Windows static preflight has now identified the base/update pair as SDK
+8.2.0 with NVN + FMOD, modules `main/subsdk0/sdk`, and a 257-file 1.88 GiB
+RomFS. It suggests a 3,328 MiB heap and no virtual-address system resource;
+these values remain provisional until the Mac runtime survey and heap check.
