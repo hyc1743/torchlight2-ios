@@ -34,6 +34,7 @@ def check_contract_files() -> dict:
         "scripts/normalize_switch_inputs.py",
         "scripts/summarize_profile_guess.py",
         "scripts/apply_nx2apple_patches.py",
+        "scripts/encrypt_resource_release.py",
     ]
     missing = [item for item in required if not (ROOT / item).is_file()]
     if missing:
@@ -47,7 +48,10 @@ def check_contract_files() -> dict:
         "validate_public_tree.py",
         "assemble_resources.py",
         "build_local_ipa.py",
-        "self-hosted",
+        "macos-26",
+        "resource_release:",
+        "TORCHLIGHT2_RESOURCE_KEY",
+        "TORCHLIGHT2_PROD_KEYS",
         "publish_ipa:",
         "default: false",
         "backend nx2apple",

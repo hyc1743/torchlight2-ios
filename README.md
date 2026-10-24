@@ -52,22 +52,11 @@ traversal and verifies every part before writing a reconstructed file.
 `normalize_switch_inputs.py` converts NSZ updates to temporary NSP files because
 `nx_extract` consumes NSP/XCI inputs.
 
-To prepare a self-hosted runner without printing key contents:
-
-```bash
-python scripts/stage_runner_inputs.py \
-  --parts /path/to/resource-parts \
-  --keys /path/to/prod.keys \
-  --runner-temp "$RUNNER_TEMP"
-```
-
-## Build on a Mac
+## Build without a local Mac
 
 NX2Apple needs Xcode, the Metal toolchain, .NET, and its documented Homebrew
 and Python dependencies, plus `zstandard`, `pycryptodome`, and `enlighten` for
-NSZ normalization. On a Mac, either use the public GitHub Actions
-workflow with a **self-hosted macOS runner** that has the local data mounted,
-or run the wrapper directly:
+NSZ normalization. The public GitHub Actions workflow builds on GitHub?s `macos-26` runner. Encrypt the local resource parts with `scripts/encrypt_resource_release.py`, upload them to a private Release, and configure the `TORCHLIGHT2_RESOURCE_KEY` and `TORCHLIGHT2_PROD_KEYS` Actions secrets. Dispatch the workflow with the Release tag in `resource_release`. For local development on a Mac, the wrapper can still be run directly:
 
 ```bash
 python scripts/build_local_ipa.py \
@@ -97,29 +86,7 @@ verifies every source file before producing its manifest.
 
 ## Public GitHub Actions workflow
 
-The workflow in `.github/workflows/build-ipa.yml` runs only on a self-hosted
-macOS runner. Before dispatching it, place the local split directory and keys
-on that runner. The workflow expects these local paths:
-
-- `$RUNNER_TEMP/torchlight2-resource-parts`: a copy of the local
-  `resource-parts/` directory containing `manifest.json` and all parts
-- `$RUNNER_TEMP/torchlight2-prod.keys`: the user's local `prod.keys`
-
-The job reconstructs the archives inside the runner's temporary directory and
-never uploads the split paths or their contents. The `publish_ipa` input
-defaults to uploading the slim IPA as a public Actions artifact; set it to
-`false` to keep the executable local. The metadata-only
-`romfs-manifest.json` may travel with the artifact; the generated ROMFSARC
-shards stay on the runner. Do not replace this with a hosted runner
-plus an uploaded game archive: that would publish proprietary game resources
-outside the local boundary.
-
-Every workflow dispatch first runs the portable Ubuntu validation job. It
-checks the public tree, the workflow contract, and a synthetic split/restore
-round trip before the macOS job is allowed to use the local dump.
-After an IPA build, the workflow validates its ZIP/Payload layout, Info.plist,
-Mach-O executable, and rejects embedded NSP/NSZ/key files before any optional
-artifact upload.
+The workflow downloads encrypted Release assets, decrypts them in `$RUNNER_TEMP`, and never places plaintext game resources in Git. See `docs/public-build.md` for the exact Release and secret setup. The `publish_ipa` input defaults to uploading the slim IPA as an Actions artifact; set it to `false` to keep the executable on the runner.
 
 ## Technical path from the reference projects
 

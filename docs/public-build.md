@@ -1,39 +1,46 @@
-# Publish and build from a public GitHub repository
+﻿# Publish and build from a public GitHub repository
 
-The local repository is ready to push, but it has no remote configured and no
-GitHub credentials are available in this workspace. Create an empty **public**
-repository, then push the source without adding `Gamedata/`, `resource-parts/`,
-`.local/`, `prod.keys`, or `title.keys`:
+The repository builds the iOS host on GitHub's Apple Silicon `macos-26`
+runner, so the local Windows machine does not need a Mac. Game inputs stay
+outside Git: split parts are encrypted locally and uploaded as assets of a
+private Release, while the production key and resource key are stored as
+Actions secrets.
+
+Push the source without adding `Gamedata/`, `resource-parts/`, `.local/`,
+`prod.keys`, or `title.keys`:
 
 ```bash
 git remote add origin https://github.com/<account>/<repository>.git
 git push -u origin master
 ```
 
-The workflow first runs its Ubuntu `portable` job. The IPA job then requires an
-Apple Silicon self-hosted runner labeled `self-hosted`, `macOS`, `ARM64`, and
-`torchlight2-local`. Before dispatching, place these files on that runner:
+Generate a local resource key and encrypt every verified split part:
 
-```text
-$RUNNER_TEMP/torchlight2-resource-parts/manifest.json
-$RUNNER_TEMP/torchlight2-resource-parts/<all part files>
-$RUNNER_TEMP/torchlight2-prod.keys
+```powershell
+python scripts/encrypt_resource_release.py seal resource-parts .local/cloud-resources
+Get-Content .local/torchlight2-resource.key
 ```
 
-Verify and copy the inputs with the repository helper:
+Store that value as the repository Actions secret `TORCHLIGHT2_RESOURCE_KEY`.
+Store the contents of `prod.keys` as `TORCHLIGHT2_PROD_KEYS`. Create a private
+Release (for example tag `resources-v1`) and upload every file in
+`.local/cloud-resources`, including `cloud-manifest.json`:
 
-```bash
-python scripts/stage_runner_inputs.py \
-  --parts /path/to/resource-parts \
-  --keys /path/to/prod.keys \
-  --runner-temp "$RUNNER_TEMP"
+```powershell
+gh release create resources-v1 .local/cloud-resources/* --repo <owner>/<repo> --title "Torchlight II resources v1" --notes "Encrypted owner-local build inputs"
 ```
 
-Run `survey_only=true` first. Review the generated survey and provisional
+The encrypted assets contain no plaintext game data. The workflow downloads
+and decrypts them only inside `$RUNNER_TEMP`, then builds the slim IPA and
+packs the local ROMFS archive.
+
+Dispatch `.github/workflows/build-ipa.yml` with `resource_release=resources-v1`.
+Run `survey_only=true` first and review the generated survey and provisional
 profile. After that succeeds, run the normal build. The workflow uses the
-NX2Apple backend, so the IPA is slim and the merged RomFS is packed locally as
-ROMFSARC shards. Copy the generated `romfs.idx` and shards into the installed
-app's `Documents/romfs/` directory. `publish_ipa` defaults to uploading the
-slim IPA as a public Actions artifact; set it to `false` to keep the executable
-local. The metadata-only `romfs-manifest.json` may be uploaded with it; the
-ROMFSARC data shards are never uploaded.
+NX2Apple backend, so the IPA is slim and the merged RomFS is packed as local
+ROMFSARC shards. Copy `romfs.idx` and the numbered shards into the installed
+app's `Documents/romfs/` directory.
+
+`publish_ipa` defaults to uploading the slim IPA as an Actions artifact. Set
+it to `false` to keep the IPA on the cloud runner. ROMFSARC data shards are
+never uploaded by the workflow.
