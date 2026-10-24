@@ -126,8 +126,6 @@ jobs:
           name: torchlight2-ios-build
           path: |
             ${{ runner.temp }}/TorchlightIIMobile.ipa
-            ${{ runner.temp }}/torchlight2-romfs/romfs-manifest.json
-            ${{ runner.temp }}/torchlight2-romfs/romfs.*
             ${{ runner.temp }}/torchlight2-work/**/survey.md
             ${{ runner.temp }}/torchlight2-work/**/*.log
           if-no-files-found: warn

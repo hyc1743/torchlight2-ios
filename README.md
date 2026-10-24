@@ -86,7 +86,7 @@ verifies every source file before producing its manifest.
 
 ## Public GitHub Actions workflow
 
-The workflow downloads encrypted Release assets, decrypts them in `$RUNNER_TEMP`, and never places plaintext game resources in Git. See `docs/public-build.md` for the exact Release and secret setup. The `publish_ipa` input defaults to uploading the slim IPA together with the separately packaged ROMFSARC files as an Actions artifact; copy those files into the installed app?s `Documents/romfs/` directory.
+The workflow downloads encrypted Release assets, decrypts them in `$RUNNER_TEMP`, and never places plaintext game resources in Git. See `docs/public-build.md` for the exact Release and secret setup. The `publish_ipa` input uploads only the slim IPA and build logs. ROMFSARC files remain local and are copied into the installed app?s `Documents/romfs/` directory separately.
 
 ## Technical path from the reference projects
 
