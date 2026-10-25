@@ -56,7 +56,7 @@ jobs:
         run: python3 scripts/validate_public_tree.py
 
       - name: Apply NX2Apple ROMFSARC segment patch
-        run: python3 scripts/apply_nx2apple_patches.py --patch patches/nx2apple-jumptable.patch --patch patches/nx2apple-romfsarc-global-shards.patch --patch patches/nx2apple-drawtexture-nop.patch --patch patches/nx2apple-enc-thread-off.patch --patch patches/nx2apple-res-check.patch --debug-jumptable
+        run: python3 scripts/apply_nx2apple_patches.py --patch patches/nx2apple-jumptable.patch --patch patches/nx2apple-romfsarc-global-shards.patch --patch patches/nx2apple-drawtexture-nop.patch --patch patches/nx2apple-enc-thread-off.patch --patch patches/nx2apple-res-check.patch --patch patches/nx2apple-fs-logging.patch --debug-jumptable
 
       - name: Compile and run segmented ROMFSARC reader test
         run: |

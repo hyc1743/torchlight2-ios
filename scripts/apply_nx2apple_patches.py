@@ -41,6 +41,8 @@ def main() -> int:
             print(f"already applied {patch.name}"); continue
         if patch.name == "nx2apple-res-check.patch" and 'setenv("DM_RES_CHECK", "1", 0);' in (backend / "dm/ios/Sources/main.m").read_text(encoding="utf-8"):
             print(f"already applied {patch.name}"); continue
+        if patch.name == "nx2apple-fs-logging.patch" and 'if (!getenv("DM_FS")) setenv("DM_FS", "1", 0);' in (backend / "dm/ios/Sources/main.m").read_text(encoding="utf-8"):
+            print(f"already applied {patch.name}"); continue
         reverse = subprocess.run(["git", "-C", str(backend), "apply", "--reverse", "--check", str(patch)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if reverse.returncode == 0: print(f"already applied {patch.name}"); continue
         sys.stderr.write(check.stderr or reverse.stderr)
