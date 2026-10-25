@@ -1,5 +1,13 @@
 # Torchlight II iOS build wrapper
 
+> **Copyright and testing notice:** Torchlight II, its code, artwork, audio,
+> and game data belong to their respective rights holders. This repository and
+> its IPA are an independent, unsigned technical test build for users who own
+> a lawful copy of the game. No game resources, NSP/NSZ files, keys, RomFS
+> shards, or other copyrighted game data are distributed by this repository or
+> its Releases. You must provide and use your own legally obtained resources;
+> installation or operation is your responsibility.
+
 This repository contains the public build wrapper and resource handling tools
 for a **user-owned** Nintendo Switch copy of *Torchlight II*. It follows the
 native-execution path used by `d2r-mobile` and `nxnative`, with the
