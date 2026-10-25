@@ -112,7 +112,7 @@ jobs:
         run: |
           romfs=$(find "$RUNNER_TEMP/torchlight2-work" -type d -name RomFS -print | sort | tail -n 1)
           test -n "$romfs"
-          python3 scripts/pack_romfs_for_iphone.py --romfs "$romfs" --output "$RUNNER_TEMP/torchlight2-romfs" --shard-mib 200
+          python3 scripts/pack_romfs_for_iphone.py --romfs "$romfs" --output "$RUNNER_TEMP/torchlight2-romfs" --shard-mib 476
           echo "ROMFSARC remains local at $RUNNER_TEMP/torchlight2-romfs"
 
       - name: Validate IPA structure

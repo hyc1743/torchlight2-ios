@@ -77,7 +77,7 @@ After a successful Mac build, create the local device resource set with:
 python scripts/pack_romfs_for_iphone.py \
   --romfs /path/to/extracted/RomFS \
   --output /path/to/romfs-parts \
-  --shard-mib 200
+  --shard-mib 476
 ```
 
 Copy `romfs.idx`, `romfs.00`, `romfs.01`, and the remaining generated shards
