@@ -65,6 +65,8 @@ def main() -> int:
                 str(Path(__file__).resolve().parents[1] / "patches" / "nx2apple-drawtexture-nop.patch"),
                 "--patch",
                 str(Path(__file__).resolve().parents[1] / "patches" / "nx2apple-enc-thread-off.patch"),
+                "--patch",
+                str(Path(__file__).resolve().parents[1] / "patches" / "nx2apple-res-check.patch"),
             ],
             check=True,
             cwd=Path(__file__).resolve().parents[1],
