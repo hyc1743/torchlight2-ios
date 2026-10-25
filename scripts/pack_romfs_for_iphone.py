@@ -69,6 +69,8 @@ def main() -> int:
             str(Path(__file__).with_name("apply_nx2apple_patches.py")),
             "--backend-dir",
             str(tool.parents[2]),
+            "--patch",
+            "patches/nx2apple-romfsarc-global-shards.patch",
         ],
         check=True,
         cwd=Path(__file__).resolve().parents[1],

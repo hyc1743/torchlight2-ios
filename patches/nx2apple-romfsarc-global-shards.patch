@@ -1,0 +1,48 @@
+--- a/dm/tools/romfs_arc.py
++++ b/dm/tools/romfs_arc.py
+@@ -68,29 +68,23 @@
+     may cross shard boundaries. This is required for games such as Torchlight
+     II whose PAK/DATA.PAK is larger than the 512 MB delivery limit.
+     """
+-    by_top = collections.OrderedDict()
++    # Fill shards in global path order so small top-level directories can share
++    # the remaining space in a shard. Large files still cross boundaries.
++    assign, shard, cur = {}, 0, 0
+     for rel, size in files:
+-        top = rel.split("/", 1)[0]
+-        by_top.setdefault(top, []).append((rel, size))
+-    # Big groups first, so the shard count stays close to the size total / shard_bytes
+-    order = sorted(by_top.items(), key=lambda kv: -sum(s for _, s in kv[1]))
+-    assign, shard, cur = {}, 0, 0
+-    for top, items in order:
+-        for rel, size in items:
+-            remaining, source_off, segments = size, 0, []
+-            while remaining:
+-                if cur == shard_bytes:
+-                    shard += 1
+-                    cur = 0
+-                take = min(remaining, shard_bytes - cur)
+-                segments.append((shard, cur, source_off, take))
+-                cur += take
+-                source_off += take
+-                remaining -= take
+-            assign[rel] = segments
+-        if cur:
+-            shard += 1
+-            cur = 0
++        remaining, source_off, segments = size, 0, []
++        while remaining:
++            if cur == shard_bytes:
++                shard += 1
++                cur = 0
++            take = min(remaining, shard_bytes - cur)
++            segments.append((shard, cur, source_off, take))
++            cur += take
++            source_off += take
++            remaining -= take
++        assign[rel] = segments
++    if cur:
++        shard += 1
+     return assign, shard
+ 
+ 

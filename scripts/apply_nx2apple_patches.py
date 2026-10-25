@@ -31,6 +31,8 @@ def main() -> int:
         if check.returncode == 0:
             subprocess.run(["git", "-C", str(backend), "apply", str(patch)], check=True)
             print(f"applied {patch.name}"); continue
+        if patch.name == "nx2apple-romfsarc-segments.patch" and "VERSION = 2" in (backend / "dm/tools/romfs_arc.py").read_text(encoding="utf-8"):
+            print(f"already applied {patch.name}"); continue
         reverse = subprocess.run(["git", "-C", str(backend), "apply", "--reverse", "--check", str(patch)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if reverse.returncode == 0: print(f"already applied {patch.name}"); continue
         sys.stderr.write(check.stderr or reverse.stderr)
