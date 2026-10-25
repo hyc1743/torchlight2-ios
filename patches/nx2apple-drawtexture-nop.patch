@@ -1,0 +1,10 @@
+--- a/dm/gfx/nvn/hle_nvn.c
++++ b/dm/gfx/nvn/hle_nvn.c
+@@ -1155,6 +1155,7 @@
+     "nvnCommandBufferPopDebugGroupId",
+     "nvnCommandBufferInsertDebugMarkerStatic",
+     "nvnCommandBufferWaitEvent",
++    "nvnCommandBufferDrawTexture",
+     "nvnWindowFinalize",
+ };
+ __attribute__((constructor)) static void nvn_nops_register(void) {
